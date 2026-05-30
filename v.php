@@ -20,7 +20,7 @@ try {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Лабораторная №5</title>
+    <title>Лабораторная №6</title>
     <link rel="stylesheet" href="style.css">
     <style>
         .container {

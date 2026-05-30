@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Лабораторная работа №5</title>
+    <title>Лабораторная работа №6</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
     <style>
@@ -284,25 +284,34 @@
 </div>
 <div class="report-container">
     <div class="report-header">
-        <h1> Лабораторная работа №5</h1>
+        <h1> Лабораторная работа №6</h1>
         <p>Работа с базой данных MySQL</p>
     </div>
     <div class="content">
         
         <div class="step">
             <h2>1. Изменение структуры БД</h2>
-            <p>Через команду <code>ALTER</code> были добавлены строки(Логин и пароль) в таблицу application. Скрипт выполнен в MySQL на учебном сервере.</p>
+            <p>Через команду <code>CREATE</code> была создана таблица admin содержащая строки Логин и пароль. Скрипт выполнен в MySQL на учебном сервере.</p>
             <div class="screenshots">
                 <div class="screenshot">
-                    <img src="1.png" alt="Alter">
-                    <div class="caption">Рис. 1 – Добавление новых строк в таблицу aaplication</div>
+                    <img src="1.png" alt="CREATE">
+                    <div class="caption">Рис. 1 – Создание таблицы admin</div>
                 </div>
             </div>
-             <p>Через команду <code>DESC</code> просмотрели структуру таблицы application. </p>
+<p>Пароль сгенерирован с помощью онлайн компилятора, потому как это самое быстрое решение. </p>
+            <div class="screenshots">
+                <div class="screenshot">
+                    <img src="11.png" alt="GENERATION">
+                    <div class="caption">Рис. 2 – Генерация пароля</div>
+                </div>
+            </div>
+
+             <p>Через команду <code>INSERT</code> вставили логин и пароль в таблицу админ. </p>
+             
              <div class="screenshots">
                 <div class="screenshot">
-                    <img src="2.png" alt="DESC">
-                    <div class="caption">Рис. 2 – Просмотр структуры таблицы application</div>
+                    <img src="2.png" alt="INSERT">
+                    <div class="caption">Рис. 3 – Вставка сгенирированного пароля</div>
                 </div>
             </div>
         </div>
