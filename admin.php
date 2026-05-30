@@ -24,12 +24,17 @@ if (!$admin || !password_verify($auth_pass, $admin['password_hash'])) {
     exit;
 }
 
-//Обработка действий: удаление, редактирование
+//Получение списка допустимых языков и полов
+$allowed_languages = getAllowedLanguages();
+$allowed_genders = ['male', 'female'];
+
+//Обработка действий
 $message = '';
 $edit_id = null;
 $edit_data = null;
+$edit_errors = [];
 
-//Удаление записи
+//Удаление
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     try {
@@ -51,14 +56,13 @@ if (isset($_GET['edit'])) {
     $stmt->execute([$edit_id]);
     $edit_data = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($edit_data) {
-        // Загружаем языки
         $lang_stmt = $pdo->prepare("SELECT l.name FROM application_language al JOIN language l ON al.language_id = l.id WHERE al.application_id = ?");
         $lang_stmt->execute([$edit_id]);
         $edit_data['languages'] = $lang_stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 }
 
-//Обработка сохранения изменений (POST)
+//Обработка сохранения изменений (POST) с полной валидацией
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     $id = (int)$_POST['edit_id'];
     $full_name = trim($_POST['full_name'] ?? '');
@@ -70,105 +74,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     $contract_accepted = isset($_POST['contract_accepted']) ? 1 : 0;
     $languages = $_POST['languages'] ?? [];
 
-    $allowed_languages = getAllowedLanguages();
-    $allowed_genders = ['male', 'female'];
-
-    $errors = [];
-    //Валидация
-    //ФИО
+    // === ВАЛИДАЦИЯ (полностью как в index.php) ===
     if (empty($full_name)) {
-        $errors['full_name'] = 'ФИО обязательно для заполнения.';
-    } elseif (!preg_match('/^[а-яА-Яa-zA-Z\s]+$/u', $form_data['full_name'])) {
-        $errors['full_name'] = 'ФИО должно содержать только буквы и пробелы.';
-    } elseif (strlen($form_data['full_name']) > 150) {
-        $errors['full_name'] = 'ФИО не должно превышать 150 символов.';
+        $edit_errors['full_name'] = 'ФИО обязательно для заполнения.';
+    } elseif (!preg_match('/^[а-яА-Яa-zA-Z\s]+$/u', $full_name)) {
+        $edit_errors['full_name'] = 'ФИО должно содержать только буквы и пробелы.';
+    } elseif (strlen($full_name) > 150) {
+        $edit_errors['full_name'] = 'ФИО не должно превышать 150 символов.';
     }
 
-    //Телефон
-    if (empty($fphone)) {
-        $errors['phone'] = 'Телефон обязателен.';
+    if (empty($phone)) {
+        $edit_errors['phone'] = 'Телефон обязателен.';
     } else {
-        $digits = preg_replace('/\D/', '', $form_data['phone']);
+        $digits = preg_replace('/\D/', '', $phone);
         $digitCount = strlen($digits);
         if ($digitCount < 10 || $digitCount > 12) {
-            $errors['phone'] = 'Номер телефона должен содержать от 10 до 12 цифр (например, +7 918 463-42-21).';
+            $edit_errors['phone'] = 'Номер телефона должен содержать от 10 до 12 цифр (например, +7 918 463-42-21).';
         }
     }
 
-    //Email
     if (empty($email)) {
-        $errors['email'] = 'Email обязателен.';
-    } elseif (!filter_var($form_data['email'], FILTER_VALIDATE_EMAIL)) {
-        $errors['email'] = 'Некорректный формат email.';
+        $edit_errors['email'] = 'Email обязателен.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $edit_errors['email'] = 'Некорректный формат email.';
     }
 
-    //Дата рождения
     if (empty($birth_date)) {
-        $errors['birth_date'] = 'Дата рождения обязательна.';
+        $edit_errors['birth_date'] = 'Дата рождения обязательна.';
     } else {
-        $date = DateTime::createFromFormat('Y-m-d', $form_data['birth_date']);
-        if (!$date || $date->format('Y-m-d') !== $form_data['birth_date']) {
-            $errors['birth_date'] = 'Некорректная дата. Используйте формат ГГГГ-ММ-ДД.';
+        $date = DateTime::createFromFormat('Y-m-d', $birth_date);
+        if (!$date || $date->format('Y-m-d') !== $birth_date) {
+            $edit_errors['birth_date'] = 'Некорректная дата. Используйте формат ГГГГ-ММ-ДД.';
         } elseif ($date > new DateTime('today')) {
-            $errors['birth_date'] = 'Дата рождения не может быть позже сегодняшнего дня.';
+            $edit_errors['birth_date'] = 'Дата рождения не может быть позже сегодняшнего дня.';
         }
     }
 
-    //Пол
     if (empty($gender)) {
-        $errors['gender'] = 'Выберите пол.';
-    } elseif (!in_array($form_data['gender'], $allowed_genders)) {
-        $errors['gender'] = 'Недопустимое значение пола.';
+        $edit_errors['gender'] = 'Выберите пол.';
+    } elseif (!in_array($gender, $allowed_genders)) {
+        $edit_errors['gender'] = 'Недопустимое значение пола.';
     }
 
-    //Языки
     if (empty($languages)) {
-        $errors['languages'] = 'Выберите хотя бы один язык программирования.';
+        $edit_errors['languages'] = 'Выберите хотя бы один язык программирования.';
     } else {
-        foreach ($form_data['languages'] as $lang) {
+        foreach ($languages as $lang) {
             if (!in_array($lang, $allowed_languages)) {
-                $errors['languages'] = 'Выбран недопустимый язык.';
+                $edit_errors['languages'] = 'Выбран недопустимый язык.';
                 break;
             }
         }
     }
 
-    //Биография
     if (strlen($biography) > 10000) {
-        $errors['biography'] = 'Биография не должна превышать 10000 символов.';
+        $edit_errors['biography'] = 'Биография не должна превышать 10000 символов.';
     }
 
-    //Чекбокс согласия
     if (!$contract_accepted) {
-        $errors['contract_accepted'] = 'Необходимо подтвердить ознакомление с контрактом.';
+        $edit_errors['contract_accepted'] = 'Необходимо подтвердить ознакомление с контрактом.';
     }
 
-    if (empty($errors)) {
+    if (empty($edit_errors)) {
         try {
             $pdo->beginTransaction();
-            $stmt = $pdo->prepare("UPDATE application SET full_name=?, phone=?, email=?, birth_date=?, gender=?, biography=?, contract_accepted=? WHERE id=?");
+            $stmt = $pdo->prepare("
+                UPDATE application 
+                SET full_name = ?, phone = ?, email = ?, birth_date = ?, 
+                    gender = ?, biography = ?, contract_accepted = ?
+                WHERE id = ?
+            ");
             $stmt->execute([$full_name, $phone, $email, $birth_date, $gender, $biography, $contract_accepted, $id]);
 
             //Обновление языков
             $pdo->prepare("DELETE FROM application_language WHERE application_id = ?")->execute([$id]);
             $lang_map = [];
             $stmt = $pdo->query("SELECT id, name FROM language");
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $lang_map[$row['name']] = $row['id'];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $lang_map[$row['name']] = $row['id'];
+            }
             $stmt = $pdo->prepare("INSERT INTO application_language (application_id, language_id) VALUES (?, ?)");
-            foreach ($languages as $lang) {
-                if (isset($lang_map[$lang])) $stmt->execute([$id, $lang_map[$lang]]);
+            foreach ($languages as $lang_name) {
+                if (isset($lang_map[$lang_name])) {
+                    $stmt->execute([$id, $lang_map[$lang_name]]);
+                }
             }
             $pdo->commit();
-            $message = "<div class='success'>Анкета №{$id} обновлена.</div>";
-            $edit_id = null; //выходим из режима редактирования
+            $message = "<div class='success'>Анкета №{$id} успешно обновлена.</div>";
+            $edit_id = null;
         } catch (Exception $e) {
             $pdo->rollBack();
-            $message = "<div class='error'>Ошибка: {$e->getMessage()}</div>";
+            $message = "<div class='error'>Ошибка БД: {$e->getMessage()}</div>";
         }
     } else {
         $message = "<div class='error'>Исправьте ошибки в форме.</div>";
-        //оказываем форму редактирования с ошибками (данные в $edit_data сохраняем)
-        $edit_data = compact('id', 'full_name', 'phone', 'email', 'birth_date', 'gender', 'biography', 'contract_accepted', 'languages');
+        //Для повторного отображения формы сохраняем введённые значения
+        $edit_data = [
+            'id' => $id,
+            'full_name' => $full_name,
+            'phone' => $phone,
+            'email' => $email,
+            'birth_date' => $birth_date,
+            'gender' => $gender,
+            'biography' => $biography,
+            'contract_accepted' => $contract_accepted,
+            'languages' => $languages
+        ];
     }
 }
 
@@ -194,6 +205,9 @@ $stmt = $pdo->query("
     ORDER BY cnt DESC, l.name
 ");
 $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Список всех языков для select
+$all_langs = $pdo->query("SELECT name FROM language ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -212,20 +226,23 @@ $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .delete-link { color: #dc2626; }
         .stats-table { margin-top: 30px; width: 50%; border-collapse: collapse; }
         .stats-table th, .stats-table td { border: 1px solid #cbd5e1; padding: 8px; }
-        .success { background: #e0f2fe; padding: 10px; border-radius: 12px; margin: 10px 0; }
-        .error { background: #fee2e2; padding: 10px; border-radius: 12px; margin: 10px 0; }
-        .edit-form { background: #f8fafc; padding: 20px; border-radius: 24px; margin-bottom: 30px; }
+        .success { background: #d1fae5; border-left: 5px solid #10b981; padding: 10px; border-radius: 12px; margin: 10px 0; }
+        .error { background: #fee2e2; border-left: 5px solid #ef4444; padding: 10px; border-radius: 12px; margin: 10px 0; }
+        .edit-form { background: #f8fafc; padding: 20px; border-radius: 24px; margin-bottom: 30px; border: 1px solid #e2e8f0; }
         .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-weight: 600; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border-radius: 12px; border: 1px solid #cbd5e1; }
-        .btn { background: #1e3a5f; color: white; border: none; padding: 8px 20px; border-radius: 30px; cursor: pointer; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 5px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border-radius: 12px; border: 1px solid #cbd5e1; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #3b82f6; outline: none; }
+        .field-error { color: #dc2626; font-size: 0.8rem; margin-top: 4px; display: block; }
+        .btn { background: #1e3a5f; color: white; border: none; padding: 8px 20px; border-radius: 30px; cursor: pointer; font-size: 0.9rem; }
         .btn-secondary { background: #64748b; }
         .back-link { margin-top: 30px; text-align: center; }
+        select[multiple] { min-height: 120px; }
     </style>
 </head>
 <body>
 <div class="admin-container">
-    <h1> управление анкетами</h1>
+    <h1>управление анкетами</h1>
     <p>Авторизован как <strong><?= htmlspecialchars($auth_login) ?></strong></p>
     <?= $message ?>
 
@@ -235,48 +252,82 @@ $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <h2>Редактирование анкеты №<?= $edit_id ?></h2>
             <form method="post">
                 <input type="hidden" name="edit_id" value="<?= $edit_id ?>">
+                
                 <div class="form-group">
                     <label>ФИО *</label>
                     <input type="text" name="full_name" value="<?= htmlspecialchars($edit_data['full_name'] ?? '') ?>" required>
+                    <?php if (isset($edit_errors['full_name'])): ?>
+                        <span class="field-error"><?= $edit_errors['full_name'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <div class="form-group">
                     <label>Телефон *</label>
                     <input type="tel" name="phone" value="<?= htmlspecialchars($edit_data['phone'] ?? '') ?>" required>
+                    <?php if (isset($edit_errors['phone'])): ?>
+                        <span class="field-error"><?= $edit_errors['phone'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <div class="form-group">
                     <label>Email *</label>
                     <input type="email" name="email" value="<?= htmlspecialchars($edit_data['email'] ?? '') ?>" required>
+                    <?php if (isset($edit_errors['email'])): ?>
+                        <span class="field-error"><?= $edit_errors['email'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <div class="form-group">
                     <label>Дата рождения *</label>
                     <input type="date" name="birth_date" value="<?= htmlspecialchars($edit_data['birth_date'] ?? '') ?>" required>
+                    <?php if (isset($edit_errors['birth_date'])): ?>
+                        <span class="field-error"><?= $edit_errors['birth_date'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <div class="form-group">
-                    <label>Пол</label>
+                    <label>Пол *</label>
                     <select name="gender">
                         <option value="male" <?= ($edit_data['gender'] ?? '') === 'male' ? 'selected' : '' ?>>Мужской</option>
                         <option value="female" <?= ($edit_data['gender'] ?? '') === 'female' ? 'selected' : '' ?>>Женский</option>
                     </select>
+                    <?php if (isset($edit_errors['gender'])): ?>
+                        <span class="field-error"><?= $edit_errors['gender'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <div class="form-group">
-                    <label>Языки программирования</label>
+                    <label>Любимые языки программирования *</label>
                     <select name="languages[]" multiple size="6">
-                        <?php
-                        $all_langs = $pdo->query("SELECT name FROM language ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
-                        foreach ($all_langs as $lang):
-                            $selected = in_array($lang, $edit_data['languages'] ?? []) ? 'selected' : '';
-                        ?>
-                            <option value="<?= htmlspecialchars($lang) ?>" <?= $selected ?>><?= htmlspecialchars($lang) ?></option>
+                        <?php foreach ($all_langs as $lang): ?>
+                            <option value="<?= htmlspecialchars($lang) ?>" <?= in_array($lang, $edit_data['languages'] ?? []) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($lang) ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
+                    <?php if (isset($edit_errors['languages'])): ?>
+                        <span class="field-error"><?= $edit_errors['languages'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <div class="form-group">
                     <label>Биография</label>
                     <textarea name="biography" rows="4"><?= htmlspecialchars($edit_data['biography'] ?? '') ?></textarea>
+                    <?php if (isset($edit_errors['biography'])): ?>
+                        <span class="field-error"><?= $edit_errors['biography'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <div class="form-group">
-                    <label><input type="checkbox" name="contract_accepted" value="1" <?= ($edit_data['contract_accepted'] ?? 0) ? 'checked' : '' ?>> Согласие с контрактом</label>
+                    <label>
+                        <input type="checkbox" name="contract_accepted" value="1" <?= ($edit_data['contract_accepted'] ?? 0) ? 'checked' : '' ?>> 
+                        Я ознакомлен(а) с контрактом *
+                    </label>
+                    <?php if (isset($edit_errors['contract_accepted'])): ?>
+                        <span class="field-error"><?= $edit_errors['contract_accepted'] ?></span>
+                    <?php endif; ?>
                 </div>
+
                 <button type="submit" class="btn">Сохранить изменения</button>
                 <a href="admin.php" class="btn btn-secondary">Отмена</a>
             </form>
@@ -284,7 +335,7 @@ $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
 
     <!-- Таблица всех анкет -->
-    <h2>Все анкеты пользователей</h2>
+    <h2> Все анкеты пользователей</h2>
     <div style="overflow-x: auto;">
         <table class="admin-table">
             <thead>
@@ -303,7 +354,7 @@ $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <td><?= htmlspecialchars($app['birth_date']) ?></td>
                     <td><?= $app['gender'] === 'male' ? 'Мужской' : 'Женский' ?></td>
                     <td style="max-width: 200px;"><?= nl2br(htmlspecialchars($app['biography'])) ?></td>
-                    <td><?= $app['contract_accepted'] ? 'Да' : '' ?></td>
+                    <td><?= $app['contract_accepted'] ? ' Да' : '' ?></td>
                     <td><?= htmlspecialchars($app['languages'] ?? '—') ?></td>
                     <td><?= htmlspecialchars($app['login']) ?></td>
                     <td class="actions">
@@ -313,7 +364,7 @@ $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </tr>
                 <?php endforeach; ?>
             </tbody>
-         </table>
+        </table>
     </div>
 
     <!-- Статистика по языкам -->
