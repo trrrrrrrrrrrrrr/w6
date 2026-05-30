@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     $errors = [];
     //Валидация
     //ФИО
-    if (empty($form_data['full_name'])) {
+    if (empty($full_name)) {
         $errors['full_name'] = 'ФИО обязательно для заполнения.';
     } elseif (!preg_match('/^[а-яА-Яa-zA-Z\s]+$/u', $form_data['full_name'])) {
         $errors['full_name'] = 'ФИО должно содержать только буквы и пробелы.';
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     }
 
     //Телефон
-    if (empty($form_data['phone'])) {
+    if (empty($fphone)) {
         $errors['phone'] = 'Телефон обязателен.';
     } else {
         $digits = preg_replace('/\D/', '', $form_data['phone']);
@@ -96,14 +96,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     }
 
     //Email
-    if (empty($form_data['email'])) {
+    if (empty($email)) {
         $errors['email'] = 'Email обязателен.';
     } elseif (!filter_var($form_data['email'], FILTER_VALIDATE_EMAIL)) {
         $errors['email'] = 'Некорректный формат email.';
     }
 
     //Дата рождения
-    if (empty($form_data['birth_date'])) {
+    if (empty($birth_date)) {
         $errors['birth_date'] = 'Дата рождения обязательна.';
     } else {
         $date = DateTime::createFromFormat('Y-m-d', $form_data['birth_date']);
@@ -115,14 +115,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     }
 
     //Пол
-    if (empty($form_data['gender'])) {
+    if (empty($gender)) {
         $errors['gender'] = 'Выберите пол.';
     } elseif (!in_array($form_data['gender'], $allowed_genders)) {
         $errors['gender'] = 'Недопустимое значение пола.';
     }
 
     //Языки
-    if (empty($form_data['languages'])) {
+    if (empty($languages)) {
         $errors['languages'] = 'Выберите хотя бы один язык программирования.';
     } else {
         foreach ($form_data['languages'] as $lang) {
@@ -134,12 +134,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_id'])) {
     }
 
     //Биография
-    if (strlen($form_data['biography']) > 10000) {
+    if (strlen($biography) > 10000) {
         $errors['biography'] = 'Биография не должна превышать 10000 символов.';
     }
 
     //Чекбокс согласия
-    if (!$form_data['contract_accepted']) {
+    if (!$contract_accepted) {
         $errors['contract_accepted'] = 'Необходимо подтвердить ознакомление с контрактом.';
     }
 
