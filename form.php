@@ -273,6 +273,7 @@
 
         <div class="footer-links">
             <a href="v.php"> Просмотр сохранённых анкет</a>
+            <a href="admin.php">УПРАВЛЕНИЕ АНКЕТАМИ</a>
             <?php if ($is_logged_in): ?>
                 <a href="logout.php"> Выйти</a>
             <?php else: ?>
